@@ -1,14 +1,15 @@
 # 해당 코드는 @jihoon2819 작성한 ipynb 파일을 python 코드로 변환했습니다.
 import os
 import math
-import numpy as np
 import PIL
-import uuid
-from tensorflow.keras.models import load_model
-from tensorflow import keras
-from tensorflow.keras.preprocessing.image import load_img
+import numpy as np
+from dataclasses import dataclass, asdict
 from PIL import ImageOps , Image as PILImage
-from uuid import UUID
+from tensorflow import keras
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.image import load_img
+from typing import List, Tuple, Dict, Any
+from uuid import UUID, uuid4
 
 save_dir = userdata.get('DB_URL')
 if not os.path.exists(save_dir):
@@ -85,7 +86,7 @@ def find_boundaries(component):
 
   return instance_size,position_xy,left,top,right,bottom
 
-def save_sperate_image(instance_id: UUID, input_image_path, matrix_component,flattened_component):
+def save_sperate_image(instance_id: UUID, input_image_path: str, matrix_component,flattened_component):
   width=matrix_component[0][0]
   height=matrix_component[0][1]
   im = PILImage.open(input_image_path)
@@ -118,3 +119,52 @@ def save_sperate_image(instance_id: UUID, input_image_path, matrix_component,fla
   blue_image = PILImage.fromarray(blue_np_cropped.astype(np.uint8), mode='L')
   mergeImage=(PILImage.merge("RGB", (red_image, green_image, blue_image)))
   mergeImage.save(f"{save_dir}/{instance_id}.png",format="png")
+
+@dataclass
+class Instance:
+  id: UUID
+  mask_url: str
+  box_coordinates: List[Tuple[int, int]]
+
+def validate_instance(instance: Instance) -> bool:
+  if not isinstance(instance.id, UUID):
+    return False
+  if not isinstance(instance.mask_url, str):
+    return False
+  if not isinstance(instance.box_coordinates, list):
+    return False
+  if not all(isinstance(coord, tuple) and len(coord) == 2 for coord in instance.box_coordinates):
+    return False
+  return True
+
+def prediction(input_img_path: str) -> List[Instance]:
+  instance_info: List[Instance] = []
+  img_size = (1024, 1024)
+  batch_size = 8
+
+  test_input_img_path = input_img_path
+  test_gen = xBDInference(batch_size, img_size, [test_input_img_path])
+  test_preds = model.predict(test_gen)
+  components = find_components(np.array(test_preds[0]))
+  flattened_components = [component for component in components]
+  matrix_components = [find_boundaries(component) for component in components]
+
+  for i in range(len(matrix_components)):
+    unique_id = uuid4()
+    instance = Instance(
+      id=unique_id,
+      mask_url=f'/static/{unique_id}.png',
+      box_coordinates=[
+        (matrix_components[i][2], matrix_components[i][3]),
+        (matrix_components[i][4], matrix_components[i][3]),
+        (matrix_components[i][4], matrix_components[i][5]),
+        (matrix_components[i][2], matrix_components[i][5])
+      ]
+    )
+    if not validate_instance(instance):
+      instance_info = []
+    else:
+      instance_info.append(instance)
+      save_sperate_image(unique_id, test_input_img_path, matrix_components[i], flattened_components[i])
+
+  return instance_info
