@@ -306,10 +306,10 @@ def prediction(input_img_path: str) -> List[Instance]:
       mask_url=f'/static/{unique_id}.png',
       label='building',
       box_coordinates=[
-          (matrix_components[i][2], matrix_components[i][3]),
-          (matrix_components[i][4], matrix_components[i][3]),
-          (matrix_components[i][4], matrix_components[i][5]),
-          (matrix_components[i][2], matrix_components[i][5])
+         (matrix_components[i][2], matrix_components[i][3]),
+         (matrix_components[i][4], matrix_components[i][3]),
+         (matrix_components[i][4], matrix_components[i][5]),
+         (matrix_components[i][2], matrix_components[i][5])
       ]
     )
     if not validate_instance(instance):
