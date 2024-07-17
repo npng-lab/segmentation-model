@@ -120,10 +120,160 @@ def save_sperate_image(instance_id: UUID, input_image_path: str, matrix_componen
   mergeImage=(PILImage.merge("RGB", (red_image, green_image, blue_image)))
   mergeImage.save(f"{save_dir}/{instance_id}.png",format="png")
 
+def save_sperate_background_image(instance_id: UUID, input_image_path: str,flattened_component):
+
+  im = PILImage.open(input_image_path)
+  width,height=im.size
+  box_padding=0
+  cropbox=(0,0,width,height)
+  cropped=im.crop(cropbox)
+  np_cropped = np.array(cropped)
+  # print('check point 1')
+  red_np_cropped = np_cropped[:,:,0]
+  green_np_cropped = np_cropped[:,:,1]
+  blue_np_cropped = np_cropped[:,:,2]
+  image_array = np.zeros((width, height), dtype=np.uint8)
+
+  forward_direction=range(box_padding,len(image_array)-box_padding)
+  backward_direction=range(len(image_array)-box_padding-1,box_padding+1,-1)
+  downward_direction=range(box_padding,len(image_array[0])-box_padding)
+  upward_direction=range(len(image_array[0])-box_padding-1,box_padding+1,-1)
+
+  for component in flattened_component:
+    for coord in component:
+      x, y = coord
+      if 0 <= (x) and 0 <= (y) :
+        image_array[x] [y]= 155  # 값을 1로 설정, 필요에 따라 다른 값으로 설정 가능
+  for i in forward_direction:
+    for j in downward_direction:
+      if image_array[i][j] != 0:
+        red_np_cropped[i][j] =0
+        green_np_cropped[i][j] =0
+        blue_np_cropped[i][j] =0
+
+ ## 패딩 채우기
+  box_padding=2
+  padding_size=((2,2),(2,2))
+  np.pad(image_array, padding_size, 'constant', constant_values=155)
+  np.pad(red_np_cropped, padding_size, 'constant', constant_values=0)
+  np.pad(green_np_cropped, padding_size, 'constant', constant_values=0)
+  np.pad(blue_np_cropped, padding_size, 'constant', constant_values=0)
+  forward_direction=range(box_padding,len(image_array)-box_padding)
+  backward_direction=range(len(image_array)-box_padding-1,box_padding+1,-1)
+  downward_direction=range(box_padding,len(image_array[0])-box_padding)
+  upward_direction=range(len(image_array[0])-box_padding-1,box_padding+1,-1)
+  ##박스 만들기
+  directions =[(-2, -2), (-2, -1), (-2, 0), (-2, 1), (-2, 2),(-1, -2), (-1, -1),
+   (-1, 0), (-1, 1), (-1, 2),(0, -2)  ,(0, -1)  ,(0, 1)  ,(0, 2),(1, -2)  ,
+   (1, -1)  ,(1, 0)  ,(1, 1)  ,(1, 2),(2, -2)  ,(2, -1)  ,(2, 0)  ,(2, 1)  ,(2, 2)]
+  directions2 = [(-1, 0), (1, 0), (0, -1), (0, 1),(1,1),(-1,1),(1,-1),(-1,-1)]
+  #순회하면서 검은색을 만났을때 주변을 확인하여 검은색이 아니면 합쳐서 평균값 넣어주기
+  for i in forward_direction:
+    for j in downward_direction:
+      if image_array[i][j] == 155:
+        red_sum_color=0
+        green_sum_color=0
+        blue_sum_color=0
+        count=0
+        max=0
+        for x,y in directions:
+          if(image_array[i+x][j+y]!=155):
+            if (max < (red_np_cropped[i+x][j+y]+green_np_cropped[i+x][j+y]+blue_np_cropped[i+x][j+y])):
+              max=red_np_cropped[i+x][j+y]+green_np_cropped[i+x][j+y]+blue_np_cropped[i+x][j+y]
+              red_sum_color=red_np_cropped[i+x][j+y]
+              green_sum_color=green_np_cropped[i+x][j+y]
+              blue_sum_color=blue_np_cropped[i+x][j+y]
+              image_array[i][j]=3
+          red_np_cropped[i][j] =red_sum_color
+          green_np_cropped[i][j] =green_sum_color
+          blue_np_cropped[i][j] =blue_sum_color
+        for x,y in directions:
+          if(image_array[i+x][j+y]!=155):
+            if (max < (red_np_cropped[i+x][j+y]+green_np_cropped[i+x][j+y]+blue_np_cropped[i+x][j+y])):
+              max=red_np_cropped[i+x][j+y]+green_np_cropped[i+x][j+y]+blue_np_cropped[i+x][j+y]
+              red_sum_color=red_np_cropped[i+x][j+y]
+              green_sum_color=green_np_cropped[i+x][j+y]
+              blue_sum_color=blue_np_cropped[i+x][j+y]
+          red_np_cropped[i][j] =red_sum_color
+          green_np_cropped[i][j] =green_sum_color
+          blue_np_cropped[i][j] =blue_sum_color
+
+  ## 셔플할 방향을 정해주고 셔플로직을 호출합니다
+  def suffle_emptyspace_around(box_padding,direction2,num):
+    left_top_started_suffle=0
+    left_bottom_started_suffle=1
+    right_bottom_started_suffle=2
+    right_top_started_suffle=3
+    
+    if(num%4==left_top_started_suffle):
+      for i in forward_direction:
+          for j in downward_direction:
+            suffle_emptyspace_logic(image_array,red_np_cropped,green_np_cropped,blue_np_cropped,i,j)
+    if(num%4==left_bottom_started_suffle):
+      for i in backward_direction:
+          for j in downward_direction:
+            suffle_emptyspace_logic(image_array,red_np_cropped,green_np_cropped,blue_np_cropped,i,j)
+
+    if(num%4==right_bottom_started_suffle):
+      for i in backward_direction:
+          for j in upward_direction:
+            suffle_emptyspace_logic(image_array,red_np_cropped,green_np_cropped,blue_np_cropped,i,j)
+    if(num%4==right_top_started_suffle):
+      for i in forward_direction:
+          for j in upward_direction:
+            suffle_emptyspace_logic(image_array,red_np_cropped,green_np_cropped,blue_np_cropped,i,j)
+  
+  ## 셔플로직
+  def suffle_emptyspace_logic(image_array,red_np_cropped,green_np_cropped,blue_np_cropped,row,col):
+    if image_array[row][col] == 3:
+      red_sum_color=0
+      green_sum_color=0
+      blue_sum_color=0
+      count=0
+      for x,y in directions2:
+        red_sum_color+=red_np_cropped[row+x][col+y]
+        green_sum_color+=green_np_cropped[row+x][col+y]
+        blue_sum_color+=blue_np_cropped[row+x][col+y]
+        count+=1
+      red_np_cropped[row][col] =red_sum_color/count
+      green_np_cropped[row][col] =green_sum_color/count
+      blue_np_cropped[row][col] =blue_sum_color/count
+  
+  
+  for num in range(8):
+    suffle_emptyspace_around(box_padding,directions2,num)
+
+  for i in range(2,len(image_array)-2):
+          for j in range(len(image_array[0])-3,1,-1):
+            if image_array[i][j] == 3:
+              for x,y in directions:
+                if(image_array[i+x][j+y] != 3):
+                  red_np_cropped[i+x][j+y]= red_np_cropped[i][j]
+                  green_np_cropped[i+x][j+y]= green_np_cropped[i][j]
+                  blue_np_cropped[i+x][j+y]=blue_np_cropped[i][j]
+  for i in range(1,len(image_array)-1):
+      for j in range(1,len(image_array[0])-1):
+        if image_array[i][j] == 3:
+          red_np_cropped[i][j] = red_np_cropped[i][j]+np.random.randint(-5,20)
+          green_np_cropped[i][j] = green_np_cropped[i][j]+np.random.randint(-5,20)
+          blue_np_cropped[i][j] = blue_np_cropped[i][j]+np.random.randint(-5,20)
+
+
+  image = PILImage.fromarray(image_array)
+
+  image = image.convert('L')
+  red_image = PILImage.fromarray(red_np_cropped.astype(np.uint8), mode='L')
+  green_image = PILImage.fromarray(green_np_cropped.astype(np.uint8), mode='L')
+  blue_image = PILImage.fromarray(blue_np_cropped.astype(np.uint8), mode='L')
+  mergeImage=(PILImage.merge("RGB", (red_image, green_image, blue_image)))
+  mergeImage.save(f"{save_dir}/{instance_id.id}.png",format="png")
+  # print(f"{save_dir}/{instance_id}.png")
+
 @dataclass
 class Instance:
   id: UUID
   mask_url: str
+  label:str
   box_coordinates: List[Tuple[int, int]]
 
 def validate_instance(instance: Instance) -> bool:
@@ -154,11 +304,12 @@ def prediction(input_img_path: str) -> List[Instance]:
     instance = Instance(
       id=unique_id,
       mask_url=f'/static/{unique_id}.png',
+      label='building',
       box_coordinates=[
-        (matrix_components[i][2], matrix_components[i][3]),
-        (matrix_components[i][4], matrix_components[i][3]),
-        (matrix_components[i][4], matrix_components[i][5]),
-        (matrix_components[i][2], matrix_components[i][5])
+         (matrix_components[i][2], matrix_components[i][3]),
+         (matrix_components[i][4], matrix_components[i][3]),
+         (matrix_components[i][4], matrix_components[i][5]),
+         (matrix_components[i][2], matrix_components[i][5])
       ]
     )
     if not validate_instance(instance):
@@ -166,5 +317,23 @@ def prediction(input_img_path: str) -> List[Instance]:
     else:
       instance_info.append(instance)
       save_sperate_image(unique_id, test_input_img_path, matrix_components[i], flattened_components[i])
+    # print('건물 저장 완료')
+  unique_id = uuid4()
+  instance=Instance(
+    id=unique_id,
+    mask_url=f'/static/{unique_id}.png',
+    label='background',
+    box_coordinates=[
+        (0,0),
+        (0,1024),
+        (1024,0),
+        (1024,1024)
+    ]
+  )
+  # print('인스턴스 저장 완료')
+  instance_info.append(instance)
+  # print('인스턴스 추가 완료')
+
+  save_sperate_background_image(instance_info[-1], test_input_img_path, flattened_components)
 
   return instance_info
