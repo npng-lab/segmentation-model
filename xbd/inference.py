@@ -93,11 +93,13 @@ def save_sperate_image(instance_id: UUID, input_image_path: str, matrix_componen
 
   cropbox=(matrix_component[5],matrix_component[2],matrix_component[3]+1,matrix_component[4]+1)
   cropped=im.crop(cropbox)
+  cropped=cropped.convert('RGBA')
   np_cropped = np.array(cropped)
 
   red_np_cropped = np_cropped[:,:,0]
   green_np_cropped = np_cropped[:,:,1]
   blue_np_cropped = np_cropped[:,:,2]
+  alpha_np_cropped = np_cropped[:,:,3]
   image_array = np.zeros((width, height), dtype=np.uint8)
 
   for coord in flattened_component:
@@ -105,19 +107,22 @@ def save_sperate_image(instance_id: UUID, input_image_path: str, matrix_componen
 
     if 0 <= (x - matrix_component[2]) and 0 <= (y - matrix_component[5]) :
       image_array[x - matrix_component[2] ] [y - matrix_component[5]]= 155  # 값을 1로 설정, 필요에 따라 다른 값으로 설정 가능
+
   for i in range(len(image_array)):
     for j in range(len(image_array[0])):
       if image_array[i][j] == 0:
         red_np_cropped[i][j] =0
         green_np_cropped[i][j] =0
         blue_np_cropped[i][j] =0
+        alpha_np_cropped[i][j]=0
   image = PILImage.fromarray(image_array)
 
   image = image.convert('L')
   red_image = PILImage.fromarray(red_np_cropped.astype(np.uint8), mode='L')
   green_image = PILImage.fromarray(green_np_cropped.astype(np.uint8), mode='L')
   blue_image = PILImage.fromarray(blue_np_cropped.astype(np.uint8), mode='L')
-  mergeImage=(PILImage.merge("RGB", (red_image, green_image, blue_image)))
+  alpha_image = PILImage.fromarray(alpha_np_cropped.astype(np.uint8), mode='L')
+  mergeImage=(PILImage.merge("RGBA", (red_image, green_image, blue_image,alpha_image)))
   mergeImage.save(f"{save_dir}/{instance_id}.png",format="png")
 
 def save_sperate_background_image(instance_id: UUID, input_image_path: str,flattened_component):
@@ -132,7 +137,10 @@ def save_sperate_background_image(instance_id: UUID, input_image_path: str,flatt
   red_np_cropped = np_cropped[:,:,0]
   green_np_cropped = np_cropped[:,:,1]
   blue_np_cropped = np_cropped[:,:,2]
-  image_array = np.zeros((width, height), dtype=np.uint8)
+  image_array = np.zeros((width, height), dtype=np.float64)
+  red_np_cropped=red_np_cropped.astype(np.float64)
+  green_np_cropped=green_np_cropped.astype(np.uint64)
+  blue_np_cropped=blue_np_cropped.astype(np.uint64)
 
   forward_direction=range(box_padding,len(image_array)-box_padding)
   backward_direction=range(len(image_array)-box_padding-1,box_padding+1,-1)
@@ -154,10 +162,11 @@ def save_sperate_background_image(instance_id: UUID, input_image_path: str,flatt
  ## 패딩 채우기
   box_padding=2
   padding_size=((2,2),(2,2))
-  np.pad(image_array, padding_size, 'constant', constant_values=155)
-  np.pad(red_np_cropped, padding_size, 'constant', constant_values=0)
-  np.pad(green_np_cropped, padding_size, 'constant', constant_values=0)
-  np.pad(blue_np_cropped, padding_size, 'constant', constant_values=0)
+  image_array=np.pad(image_array, padding_size, 'constant', constant_values=155)
+  red_np_cropped=np.pad(red_np_cropped, padding_size, 'constant', constant_values=0)
+  green_np_cropped=np.pad(green_np_cropped, padding_size, 'constant', constant_values=0)
+  blue_np_cropped=np.pad(blue_np_cropped, padding_size, 'constant', constant_values=0)
+  print(len(blue_np_cropped[0]))
   forward_direction=range(box_padding,len(image_array)-box_padding)
   backward_direction=range(len(image_array)-box_padding-1,box_padding+1,-1)
   downward_direction=range(box_padding,len(image_array[0])-box_padding)
@@ -204,7 +213,7 @@ def save_sperate_background_image(instance_id: UUID, input_image_path: str,flatt
     left_bottom_started_suffle=1
     right_bottom_started_suffle=2
     right_top_started_suffle=3
-    
+
     if(num%4==left_top_started_suffle):
       for i in forward_direction:
           for j in downward_direction:
@@ -222,7 +231,7 @@ def save_sperate_background_image(instance_id: UUID, input_image_path: str,flatt
       for i in forward_direction:
           for j in upward_direction:
             suffle_emptyspace_logic(image_array,red_np_cropped,green_np_cropped,blue_np_cropped,i,j)
-  
+
   ## 셔플로직
   def suffle_emptyspace_logic(image_array,red_np_cropped,green_np_cropped,blue_np_cropped,row,col):
     if image_array[row][col] == 3:
@@ -238,25 +247,16 @@ def save_sperate_background_image(instance_id: UUID, input_image_path: str,flatt
       red_np_cropped[row][col] =red_sum_color/count
       green_np_cropped[row][col] =green_sum_color/count
       blue_np_cropped[row][col] =blue_sum_color/count
-  
-  
+
+
   for num in range(8):
     suffle_emptyspace_around(box_padding,directions2,num)
-
-  for i in range(2,len(image_array)-2):
-          for j in range(len(image_array[0])-3,1,-1):
-            if image_array[i][j] == 3:
-              for x,y in directions:
-                if(image_array[i+x][j+y] != 3):
-                  red_np_cropped[i+x][j+y]= red_np_cropped[i][j]
-                  green_np_cropped[i+x][j+y]= green_np_cropped[i][j]
-                  blue_np_cropped[i+x][j+y]=blue_np_cropped[i][j]
   for i in range(1,len(image_array)-1):
       for j in range(1,len(image_array[0])-1):
         if image_array[i][j] == 3:
-          red_np_cropped[i][j] = red_np_cropped[i][j]+np.random.randint(-5,20)
-          green_np_cropped[i][j] = green_np_cropped[i][j]+np.random.randint(-5,20)
-          blue_np_cropped[i][j] = blue_np_cropped[i][j]+np.random.randint(-5,20)
+          red_np_cropped[i][j] = red_np_cropped[i][j]+np.random.randint(-5,5)
+          green_np_cropped[i][j] = green_np_cropped[i][j]+np.random.randint(-5,5)
+          blue_np_cropped[i][j] = blue_np_cropped[i][j]+np.random.randint(-5,5)
 
 
   image = PILImage.fromarray(image_array)
@@ -296,6 +296,7 @@ def prediction(input_img_path: str) -> List[Instance]:
   test_gen = xBDInference(batch_size, img_size, [test_input_img_path])
   test_preds = model.predict(test_gen)
   components = find_components(np.array(test_preds[0]))
+  components=list(filter(lambda x: len(x) > 100, components))
   flattened_components = [component for component in components]
   matrix_components = [find_boundaries(component) for component in components]
 
@@ -326,14 +327,12 @@ def prediction(input_img_path: str) -> List[Instance]:
     box_coordinates=[
         (0,0),
         (0,1024),
+        (1024,1024),
         (1024,0),
-        (1024,1024)
     ]
   )
+
   # print('인스턴스 저장 완료')
   instance_info.append(instance)
-  # print('인스턴스 추가 완료')
-
   save_sperate_background_image(instance_info[-1], test_input_img_path, flattened_components)
-
   return instance_info
