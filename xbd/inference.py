@@ -1,9 +1,7 @@
 # 해당 코드는 @jihoon2819 작성한 ipynb 파일을 python 코드로 변환했습니다.
 import os
 import math
-import queue
 import PIL
-import random
 import numpy as np
 from dataclasses import dataclass, asdict
 from PIL import ImageOps , Image as PILImage
@@ -253,15 +251,6 @@ def save_sperate_background_image(instance_id: UUID, input_image_path: str,flatt
 
   for num in range(8):
     suffle_emptyspace_around(box_padding,directions2,num)
-  # 이과정은 일단생략
-  # for i in range(2,len(image_array)-2):
-  #         for j in range(len(image_array[0])-3,1,-1):
-  #           if image_array[i][j] == 3:
-  #             for x,y in directions:
-  #               if(image_array[i+x][j+y] != 3):
-  #                 red_np_cropped[i+x][j+y]= red_np_cropped[i][j]
-  #                 green_np_cropped[i+x][j+y]= green_np_cropped[i][j]
-  #                 blue_np_cropped[i+x][j+y]=blue_np_cropped[i][j]
   for i in range(1,len(image_array)-1):
       for j in range(1,len(image_array[0])-1):
         if image_array[i][j] == 3:
@@ -311,9 +300,6 @@ def prediction(input_img_path: str) -> List[Instance]:
   flattened_components = [component for component in components]
   matrix_components = [find_boundaries(component) for component in components]
 
-  ## 그림자 판단 로직
-
-  print(len(matrix_components))
   for i in range(len(matrix_components)):
     unique_id = uuid4()
     instance = Instance(
@@ -321,10 +307,10 @@ def prediction(input_img_path: str) -> List[Instance]:
       mask_url=f'/static/{unique_id}.png',
       label='building',
       box_coordinates=[
-         (matrix_components[i][2], matrix_components[i][3]),
-         (matrix_components[i][4], matrix_components[i][3]),
-         (matrix_components[i][4], matrix_components[i][5]),
-         (matrix_components[i][2], matrix_components[i][5])
+          (matrix_components[i][2], matrix_components[i][3]),
+          (matrix_components[i][4], matrix_components[i][3]),
+          (matrix_components[i][4], matrix_components[i][5]),
+          (matrix_components[i][2], matrix_components[i][5])
       ]
     )
     if not validate_instance(instance):
@@ -345,7 +331,6 @@ def prediction(input_img_path: str) -> List[Instance]:
         (1024,0),
     ]
   )
-  print(instance)
 
   # print('인스턴스 저장 완료')
   instance_info.append(instance)
